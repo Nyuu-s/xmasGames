@@ -5,8 +5,14 @@ let gameObjects = []
 let isGameOver = 0
 let secondsPassed = 0;
 let oldTimeStamp = 0;
-let movingSpeed = 50;
+let movingSpeed = 500;
 let tabFocused = true
+let inputStates = {
+    r: false,
+    l: false,
+    d: false,
+    u: false
+}
 
 const canvas = document.getElementById("game");
 const GRID_UNIT = 30
@@ -17,7 +23,7 @@ class GameObject {
         this.context = context
         this.pos = pos
         this.vel = vel
-
+        this.restitution = 0.9
         this.isColliding = false
     }
 }
@@ -29,25 +35,63 @@ class Player extends GameObject {
         this.pos = pos
         this.vel = vel
         this.color = color
-
+        this.restitution = 0
         this.width = GRID_UNIT
         this.height = 2*GRID_UNIT
+    }
+
+    isGrounded()
+    {
+   
+        for (const obj of gameObjects) {
+
+            if(!(obj instanceof Player) 
+                && ((obj.pos.y == this.pos.y + this.height)
+                || (this.pos.y + this.height == canvas.clientHeight))){
+                return true
+            }
+        }
+        return false
     }
 
     draw(){
         this.context.fillStyle = this.color;
         this.context.fillRect(this.pos.x, this.pos.y, this.width, this.height); 
     }
-
+    
     update(deltaTime){
-        if(this.isColliding)
+        // if(this.isColliding)
+        // {
+        //     this.pos.x = this.pos.x
+        // }
+
+        this.vel.y += 2 * GRAVITY * deltaTime
+        let grounded = this.isGrounded()
+        if(inputStates.l && !inputStates.r)
         {
-            this.pos.x = this.pos.x
+            this.vel.x = -movingSpeed
         }
-        else
+        else if(inputStates.r && !inputStates.l)
         {
-            this.pos.x += (movingSpeed * deltaTime)
+            this.vel.x = movingSpeed
         }
+        else if ((!inputStates.r && !inputStates.l) || (inputStates.r && inputStates.l)) {
+            this.vel.x = 0
+        }
+        //  else if(((!inputStates.r && !inputStates.l) || (inputStates.r && inputStates.l)) && grounded)
+        // {
+        //     this.vel.x = 0
+        // }
+        if(inputStates.u && !inputStates.d && grounded/* isgrounded */)
+        {
+            this.vel.y -= 10 * GRID_UNIT// Y axis is facing down
+            console.log(this.vel);
+        }
+
+        
+        this.pos.y += this.vel.y * deltaTime
+        this.pos.x += this.vel.x * deltaTime
+
     }
 
 }
@@ -89,27 +133,27 @@ function AABBisIntersecting(box1, box2){
 
 function HandleBorderCollisions()
  {
-     const restitution = 0.9;
+
      let obj;
      for (let i = 0; i < gameObjects.length; i++)
      {
          obj = gameObjects[i];
 
          // Check for left and right
-         if (obj.pos.x < obj.width){
-             obj.vel.x = Math.abs(obj.vel.x) * restitution;
-             obj.pos.x = obj.width;
+         if (obj.pos.x < 0){
+             obj.vel.x = Math.abs(obj.vel.x) * obj.restitution;
+             obj.pos.x = 0;
          }else if (obj.pos.x > canvas.clientWidth - obj.width){
-             obj.vel.x = -Math.abs(obj.vel.x) * restitution;
+             obj.vel.x = -Math.abs(obj.vel.x) * obj.restitution;
              obj.pos.x = canvas.clientWidth - obj.width;
          }
 
          // Check for bottom and top
-         if (obj.pos.y < obj.height){
-             obj.vel.y = Math.abs(obj.vel.y) * restitution;
-             obj.pos.y = obj.height;
+         if (obj.pos.y < 0){
+             obj.vel.y = Math.abs(obj.vel.y) * obj.restitution;
+             obj.pos.y = 0;
          } else if (obj.pos.y > canvas.clientHeight - obj.height){
-             obj.vel.y = -Math.abs(obj.vel.y) * restitution;
+             obj.vel.y = -Math.abs(obj.vel.y) * obj.restitution;
              obj.pos.y = canvas.clientHeight - obj.height;
          }
      }
@@ -135,13 +179,41 @@ function initGame()
     //init game level
     
     //init game objects
-    gameObjects.push(new Square(ctx, {x:3.5 * GRID_UNIT, y:3 *GRID_UNIT}, {x:0, y:0}))
-    gameObjects.push(new Square(ctx, {x:7 * GRID_UNIT, y:1 * GRID_UNIT},  {x:0, y:0}))
-    gameObjects.push(new Square(ctx, {x:3 * GRID_UNIT, y:7 * GRID_UNIT},  {x:0, y:0}))
-    gameObjects.push(new Square(ctx, {x:9* GRID_UNIT, y:9* GRID_UNIT},    {x:0, y:0}))
+    gameObjects.push(new Square(ctx, {x:3.5 * GRID_UNIT, y:3 *GRID_UNIT}, {x:0, y:1000}))
+    gameObjects.push(new Square(ctx, {x:7 * GRID_UNIT, y:1 * GRID_UNIT},  {x:-1000, y:0}))
+    // gameObjects.push(new Square(ctx, {x:3 * GRID_UNIT, y:7 * GRID_UNIT},  {x:0, y:0}))
+    // gameObjects.push(new Square(ctx, {x:9* GRID_UNIT, y:9* GRID_UNIT},    {x:0, y:0}))
     
     //init player
-    gameObjects.push(new Player(ctx, {x:0, y:0}, {x:10, y:0}))
+    let player = new Player(ctx, {x:0, y:0}, {x:0, y:0})
+    gameObjects.push(player)
+
+    window.addEventListener("keydown", (e) => {
+
+        
+        if(e.key == "ArrowRight"){
+            inputStates.r = true
+        }
+        if(e.key == "ArrowLeft"){
+           inputStates.l = true
+        }
+        if(e.key == "ArrowUp")
+        {
+            inputStates.u = true
+        }
+    })
+    window.addEventListener("keyup", (e) => {
+        if(e.key == "ArrowRight"){
+            inputStates.r = false
+        }
+        if(e.key == "ArrowLeft"){
+            inputStates.l = false
+        }
+        if(e.key == "ArrowUp")
+        {
+            inputStates.u = false
+        }
+    })
  
     console.log(gameObjects);
     //TODO: init inputs
@@ -195,6 +267,11 @@ function computeIntersections() {
             
     }
 }
+function updateInputs()
+{
+
+}
+
 function gameLoop(timeStamp)
 {
     // Calculate how much time has passed
